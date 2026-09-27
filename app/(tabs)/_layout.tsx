@@ -136,6 +136,8 @@ export default function TabsLayout() {
       {TABS.map((t) => (
         <Tabs.Screen key={t.name} name={t.name} options={{ title: t.label, headerShown: false }} />
       ))}
+      {/* the entry route redirects; it is not a destination, so hide it */}
+      <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );
 }

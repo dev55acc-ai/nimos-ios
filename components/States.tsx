@@ -8,6 +8,7 @@ import { haptic, useReduceMotion } from "../src/a11y";
 import { MOTION } from "../src/motion";
 import { Glass } from "./ui";
 import { Mark } from "./Mark";
+import { useRouter } from "expo-router";
 
 /** Shimmering placeholder. Respects reduce-motion (static block instead). */
 export function Skeleton({ height = 18, width = "100%", style }: { height?: number; width?: number | `${number}%`; style?: ViewStyle }) {
@@ -69,21 +70,25 @@ export function PulseSkeleton() {
 /** Offline / auth / server failure. Always offers the way out. */
 export function ErrorState({ onRetry, detail }: { onRetry: () => void; detail?: string }) {
   const t = useType();
+  const router = useRouter();
   return (
     <Animated.View entering={FadeIn.duration(280)} style={{ paddingHorizontal: 20, paddingTop: 60, alignItems: "center", gap: 16 }}>
-      <Mark name="link" size={34} color={C.danger} />
+      <Mark name={detail ? "link" : "pulse"} size={34} color={C.danger} />
       <View style={{ alignItems: "center", gap: 6 }}>
         <Text style={[t.bodyStrong, { color: C.txt, textAlign: "center" }]}>
-          Can&apos;t reach the control plane
+          {detail ? "The spine refused that" : "No spine connected"}
         </Text>
         <Text style={[t.caption, { color: C.dim, textAlign: "center", maxWidth: 280 }]}>
-          {detail ?? "Check the URL and token on the Link tab, then try again."}
+          {detail ?? "Open the Link tab and paste your spine URL and token."}
         </Text>
       </View>
       <Pressable
         onPress={() => {
           haptic.act();
-          onRetry();
+          // Unlinked is a different problem from "the request failed": the fix
+          // is to connect, not to retry the same request.
+          if (!detail) router.push("/link");
+          else onRetry();
         }}
         accessibilityRole="button"
         accessibilityLabel="Retry connection"
@@ -98,7 +103,7 @@ export function ErrorState({ onRetry, detail }: { onRetry: () => void; detail?: 
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        <Text style={[t.action, { color: C.txt }]}>Try again</Text>
+        <Text style={[t.action, { color: C.txt }]}>{detail ? "Try again" : "Open Link"}</Text>
       </Pressable>
     </Animated.View>
   );
