@@ -65,6 +65,21 @@ jobs:
           npx expo prebuild --platform ios --clean --no-install
           npx pod-install ios
 
+      - name: Embed the JS bundle explicitly
+        run: |
+          set -euo pipefail
+          # Don't rely on the Xcode bundling phase: make the artifact explicit,
+          # then assert it exists. A Release .app with no main.jsbundle launches
+          # to a blank black screen, which is what we were staring at.
+          npx expo export:embed \
+            --platform ios \
+            --dev false \
+            --entry-file index.ts \
+            --bundle-output ios/main.jsbundle \
+            --assets-dest ios
+          test -s ios/main.jsbundle || { echo "::error::bundle was not produced"; exit 1; }
+          ls -lh ios/main.jsbundle
+
       - name: Build for the simulator
         run: |
           set -euo pipefail
@@ -90,8 +105,11 @@ jobs:
           APP=$(find ios/build/Build/Products -name "*.app" -maxdepth 3 | head -1)
           echo "app=$APP"
           xcrun simctl install "$SIM" "$APP"
-          xcrun simctl launch "$SIM" "$APP_ID" || true
-          sleep 12
+          # capture the app's own output: this is where a JS error shows up
+          ( xcrun simctl launch --console "$SIM" "$APP_ID" > /tmp/app.log 2>&1 & ) || true
+          sleep 14
+          echo "--- app console (last 20) ---"
+          tail -20 /tmp/app.log || echo "(no output)"
 
       - name: Screenshot every screen
         run: |
@@ -110,6 +128,15 @@ jobs:
           shot "03-media"  "nimos://media"
           shot "04-link"   "nimos://link"
           ls -la shots/
+
+      - name: Upload the app console log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-console
+          path: /tmp/app.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
