@@ -1,0 +1,233 @@
+name: ios-device-ipa
+# Build a real, native, UNSIGNED device .ipa on GitHub's free macOS runners.
+#
+# Why unsigned on purpose: a *signed* device build needs Apple credentials, which
+# needs the $99/yr programme. We do not sign here. The unsigned .ipa is re-signed
+# on the developer's own machine by AltStore/SideStore using a FREE Apple ID
+# (7-day auto refresh). Net cost $0, no Apple membership, no Mac.
+#
+# Xcode is macOS-only — that is exactly why this runs on a macOS runner: it is
+# the one place a Windows/Linux box can get a real iOS toolchain for free.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_dir:
+        description: "App directory relative to the repo root"
+        required: false
+        default: "."
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # macos-15 ships a newer Xcode. macos-14 tops out at 16.2 (Swift 6.0) and
+    # expo-modules-jsi needs Swift tools 6.2 => Xcode >= 16.4.
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode (RN 0.86 needs >= 16.1)
+        run: |
+          set -euo pipefail
+          echo "installed:"
+          ls -1 /Applications | grep -i xcode || true
+          # Rank what is ACTUALLY installed and pick the newest whose Swift is
+          # >= 6.2. Hardcoding a version list failed here: the image ships
+          # Xcode_26.3.app (Swift 6.2.4), not "Xcode_26.app".
+          best=""
+          for a in /Applications/Xcode*.app; do
+            [ -d "$a" ] || continue
+            ver="$(basename "$a" .app)"
+            num="${ver#Xcode_}"
+            sv="$(DEVELOPER_DIR="$a/Contents/Developer" xcrun swiftc --version 2>/dev/null | head -1 || true)"
+            sv="${sv#*Swift version }"
+            sv="${sv%% *}"
+            major="${sv%%.*}"; rest="${sv#*.}"; minor="${rest%%.*}"
+            ok=0
+            if [ "$major" -ge 7 ] 2>/dev/null; then ok=1
+            elif [ "$major" -eq 6 ] 2>/dev/null && [ "$minor" -ge 2 ] 2>/dev/null; then ok=1
+            fi
+            if [ "$ok" = "1" ]; then
+              # higher version wins (26 > 16)
+              if [ -z "$best" ] || [ "${num%%.*}" -gt "${best%%.*}" ] || \
+                 { [ "${num%%.*}" = "${best%%.*}" ] && [ "${num#*.}" -gt "${best#*.}" ]; }; then
+                best="$num"
+              fi
+            fi
+          done
+          if [ -z "$best" ]; then
+            echo "::error::no Xcode with Swift >= 6.2 on this image"
+            exit 1
+          fi
+          sudo xcode-select -s "/Applications/Xcode_${best}.app"
+          echo "selected Xcode_${best}.app"
+
+          # `|| true` is load-bearing: under `set -o pipefail` a single xcrun
+          # probe that fails (unsupported/unlicensed toolchain) aborts the whole
+          # step, which is how this job died right after printing the list.
+          for a in /Applications/Xcode*.app; do
+            [ -d "$a" ] || continue
+            v="$(DEVELOPER_DIR="$a/Contents/Developer" xcrun swiftc --version 2>/dev/null | head -1 || true)"
+            printf '%s -> %s\n' "$(basename "$a")" "${v:-unavailable}"
+          done
+          XV="$(xcodebuild -version)"
+          echo "$XV"
+          # Swift 6.2 (Xcode 16.4) or newer is required by expo-modules-jsi.
+          SW="$(xcrun swiftc --version 2>/dev/null | head -1 || true)"
+          echo "$SW"
+          case "$SW" in
+            *"Swift version 6."[2-9]*|*"Swift version 7"*) : ;;
+            *) echo "::error::need Swift >= 6.2 (Xcode >= 16.4); got: $SW"; exit 1 ;;
+          esac
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        working-directory: ${{ github.workspace }}/${{ inputs.app_dir || '.' }}
+        run: npm install --no-audit --no-fund
+
+      - name: Prebuild the native iOS project
+        working-directory: ${{ github.workspace }}/${{ inputs.app_dir || '.' }}
+        env:
+          EXPO_NO_TELEMETRY: "1"
+          CI: "1"
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        run: |
+          set -euo pipefail
+          sudo gem install cocoapods --no-document -v 1.16.2
+          pod --version
+
+      - name: Pod install
+        working-directory: ${{ github.workspace }}/${{ inputs.app_dir || '.' }}
+        run: npx pod-install ios
+
+      - name: Shim xcodebuild so nested builds stay unsigned
+        run: |
+          set -euo pipefail
+          # ExpoModulesJSI's "[CP-User] Build ExpoModulesJSI xcframework" phase
+          # shells out to a NESTED `xcodebuild` under `env -i`, which throws away
+          # our CODE_SIGNING_ALLOWED=NO. The nested build then tries to sign with
+          # no identity and the phase fails. That script forwards PATH, so a
+          # wrapper placed first on PATH reaches the nested call and re-adds the
+          # unsigned flags. This is what makes a credential-free build possible.
+          mkdir -p /tmp/xcw
+          cat > /tmp/xcw/xcodebuild <<'SHIM'
+          #!/bin/bash
+          # Re-add unsigned flags unless the caller already set them.
+          has() { for a in "$@"; do [[ "$a" == "$1" || "$a" == "$1="* ]] && return 0; done; return 1; }
+          extra=()
+          has CODE_SIGNING_ALLOWED  || extra+=(CODE_SIGNING_ALLOWED=NO)
+          has CODE_SIGNING_REQUIRED  || extra+=(CODE_SIGNING_REQUIRED=NO)
+          has CODE_SIGN_IDENTITY     || extra+=(CODE_SIGN_IDENTITY="")
+          # Expo SDK 57's expo-modules-jsi declares swift-tools-version 6.2, which
+          # makes the compiler default to Swift 6 language mode — and its own code
+          # then fails ("'weak' must be a mutable variable"). Pinning the
+          # LANGUAGE mode to 5 while keeping the 6.2 tools version resolves it.
+          has SWIFT_VERSION          || extra+=(SWIFT_VERSION=5.0)
+          exec /usr/bin/xcodebuild "$@" ${extra[@]+"${extra[@]}"}
+          SHIM
+          chmod +x /tmp/xcw/xcodebuild
+          echo "shim installed: $(PATH=/tmp/xcw:$PATH command -v xcodebuild)"
+          echo "PATH=/tmp/xcw:$PATH" >> "$GITHUB_ENV"
+
+      # Resolve the project from disk in every step that needs it. Guessing the
+      # workspace name from the display name is what produced
+      # "'ios/.xcworkspace' does not exist" on the first attempt.
+      - name: Build unsigned device binary
+        working-directory: ${{ github.workspace }}/${{ inputs.app_dir || '.' }}
+        run: |
+          set -euo pipefail
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+          PROJECT=$(ls -d ios/*.xcodeproj | head -1)
+          SCHEME=$(ls ios/*/xcshareddata/xcschemes/*.xcscheme 2>/dev/null | head -1 \
+                   | xargs -r basename | sed 's/.xcscheme$//')
+          [ -n "$SCHEME" ] || SCHEME=$(basename "$PROJECT" .xcodeproj)
+          echo "workspace=$WORKSPACE"
+          echo "scheme=$SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            SWIFT_VERSION=5.0 \
+            build > /tmp/xcodebuild.log 2>&1 || {
+              echo "::error::xcodebuild failed"
+              echo "--- real errors ---"
+              grep -nE "error:|error :|Command .* failed|The following build commands failed|codesign|CodeSign" \
+                /tmp/xcodebuild.log | head -30 || true
+              echo "--- last 25 lines ---"
+              tail -25 /tmp/xcodebuild.log
+              exit 1
+            }
+          grep -E "BUILD SUCCEEDED" /tmp/xcodebuild.log || tail -5 /tmp/xcodebuild.log
+
+      - name: Package the .ipa
+        working-directory: ${{ github.workspace }}/${{ inputs.app_dir || '.' }}
+        run: |
+          set -euo pipefail
+          APP=$(basename "$(ls -d ios/*.xcworkspace | head -1)" .xcworkspace)
+          APP_PATH="ios/build/Build/Products/Release-iphoneos/${APP}.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::error::no .app at $APP_PATH"
+            find ios/build/Build/Products -maxdepth 2 -name '*.app' || true
+            exit 1
+          fi
+          rm -rf /tmp/ipa && mkdir -p /tmp/ipa/Payload
+          cp -R "$APP_PATH" /tmp/ipa/Payload/
+          rm -rf "/tmp/ipa/Payload/${APP}.app/_CodeSignature" || true
+          ( cd /tmp/ipa && zip -qry "$GITHUB_WORKSPACE/${APP}-unsigned.ipa" Payload )
+          cd "$GITHUB_WORKSPACE"
+          ls -lh *-unsigned.ipa
+          BIN="/tmp/ipa/Payload/${APP}.app/${APP}"
+          echo "--- binary ---"
+          lipo -info "$BIN" || true
+          file "$BIN" || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
+            "/tmp/ipa/Payload/${APP}.app/Info.plist"
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: /tmp/xcodebuild.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload the .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: ${{ github.workspace }}/*-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Install instructions
+        run: |
+          {
+            echo "### iOS device build (unsigned) — install with a FREE Apple ID"
+            echo ""
+            echo "1. Download the \`ios-unsigned-ipa\` artifact and unzip it to get the .ipa"
+            echo "2. On **Windows**: install AltStore (altstore.io), connect the iPhone by USB"
+            echo "3. In AltStore: **My Apps → +** → pick the .ipa. It re-signs it with your Apple ID"
+            echo "4. Turn on **AltStore → Settings → Automatic Refresh** so it re-signs every 7 days"
+            echo ""
+            echo "No Apple Developer membership required. No Mac required."
+          } >> "$GITHUB_STEP_SUMMARY"

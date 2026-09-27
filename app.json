@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Nimos",
+    "slug": "nimos-ios",
+    "scheme": "nimos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#05060a",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ca.motionmenu.nimos",
+      "requireFullScreen": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#05060a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#05060a",
+          "resizeToMatchFullScreen": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {}
+    },
+    "runtimeVersion": "1.0.0",
+    "owner": "dafnimos",
+    "platforms": [
+      "ios"
+    ]
+  }
+}
