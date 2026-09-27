@@ -16,7 +16,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import { C, RADIUS } from "../src/theme";
-import { EASE_OUT } from "../src/motion";
+import { EASE_OUT, MOTION } from "../src/motion";
 import { useCountUp } from "../src/motion";
 import { useType } from "../src/type";
 
@@ -101,15 +101,19 @@ type VoltProps = Omit<PressableProps, "style"> & {
 
 /** The app's single primary-action shape. Volt gradient + haptics. */
 export function VoltButton({ label, done, full, onPress, disabled, wrapperStyle, ...rest }: VoltProps) {
+  const t = useType();
   const scale = useSharedValue(1);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <Pressable
       {...rest}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled || !!done }}
       disabled={disabled ?? done}
-      onPressIn={() => (scale.value = withTiming(0.97, { duration: 90 }))}
-      onPressOut={() => (scale.value = withTiming(1, { duration: 180, easing: EASE_OUT }))}
+      onPressIn={() => (scale.value = withTiming(0.97, { duration: MOTION.press.in }))}
+      onPressOut={() => (scale.value = withTiming(1, { duration: MOTION.press.out, easing: EASE_OUT }))}
       onPress={(e) => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress?.(e);
@@ -117,7 +121,7 @@ export function VoltButton({ label, done, full, onPress, disabled, wrapperStyle,
     >
       <Animated.View style={[style, full ? { alignSelf: "stretch" } : { alignSelf: "flex-start" }, wrapperStyle]}>
         <LinearGradient
-          colors={done ? ["rgba(255,255,255,0.07)", "rgba(255,255,255,0.04)"] : [C.acc, "#8fe31f"]}
+          colors={done ? ["rgba(255,255,255,0.07)", "rgba(255,255,255,0.04)"] : [C.acc, C.accDeep]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={{
@@ -128,7 +132,7 @@ export function VoltButton({ label, done, full, onPress, disabled, wrapperStyle,
             opacity: done ? 0.85 : 1,
           }}
         >
-          <Animated.Text style={{ fontSize: 13, fontWeight: "800", letterSpacing: 0.3, color: done ? C.dim : "#05060a" }}>
+          <Animated.Text style={[t.caption, { fontWeight: "800", letterSpacing: 0.3, color: done ? C.dim : C.accInk }]}>
             {label}
           </Animated.Text>
         </LinearGradient>
@@ -139,6 +143,7 @@ export function VoltButton({ label, done, full, onPress, disabled, wrapperStyle,
 
 /** Hairline ledger row — the quiet proof surface. */
 export function LedgerRow({ left, right, title, last }: { left: string; right?: string; title: string; last?: boolean }) {
+  const t = useType();
   return (
     <View
       style={{
@@ -149,10 +154,10 @@ export function LedgerRow({ left, right, title, last }: { left: string; right?: 
       }}
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
-        <Animated.Text style={{ color: C.dim2, fontSize: 11, letterSpacing: 0.4 }}>{left}</Animated.Text>
-        {right ? <Animated.Text style={{ color: C.acc2, fontSize: 11, letterSpacing: 0.4 }}>{right}</Animated.Text> : null}
+        <Animated.Text style={[t.mono, { color: C.dim2 }]}>{left}</Animated.Text>
+        {right ? <Animated.Text style={[t.mono, { color: C.acc2 }]}>{right}</Animated.Text> : null}
       </View>
-      <Animated.Text style={{ fontSize: 13, lineHeight: 19, color: C.txt }}>{title}</Animated.Text>
+      <Animated.Text style={[t.body, { color: C.txt }]}>{title}</Animated.Text>
     </View>
   );
 }

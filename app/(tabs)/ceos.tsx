@@ -70,7 +70,7 @@ export default function CeosScreen() {
           />
         }
         ListHeaderComponent={
-          <View style={{ paddingHorizontal: 20, paddingBottom: 14 }}>
+          <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
             <Text style={[t.hero, { color: C.txt }]} accessibilityRole="header">
               CEOs
             </Text>
@@ -105,7 +105,7 @@ function CeoRow({ agent, business }: { agent: Agent; business?: Business }) {
       accessibilityLabel={`Talk to ${agent.name}${business ? `, ${business.name}` : ""}`}
       style={({ pressed }) => ({ marginHorizontal: 20, marginBottom: 10, opacity: pressed ? 0.75 : 1 })}
     >
-      <Glass style={{ flexDirection: "row", alignItems: "center", padding: 14, minHeight: HIT + 26 }}>
+      <Glass style={{ flexDirection: "row", alignItems: "center", padding: 12, minHeight: HIT + 26 }}>
         <View
           style={{
             width: 40,
@@ -119,7 +119,7 @@ function CeoRow({ agent, business }: { agent: Agent; business?: Business }) {
             marginRight: 14,
           }}
         >
-          <Text style={{ fontSize: 15, color: C.acc, fontWeight: "800" }}>
+          <Text style={[t.heading, { color: C.acc, fontWeight: "800" }]}>
             {agent.name.trim().charAt(0).toUpperCase() || "?"}
           </Text>
         </View>

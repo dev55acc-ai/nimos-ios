@@ -6,6 +6,7 @@
 //  - every surface is a hairline-bordered glass panel, never a solid card
 
 export const C = {
+  void: "#000000",
   bg: "#05060a",
   bg2: "#0a0c14",
   card: "rgba(255,255,255,0.04)",
@@ -15,6 +16,8 @@ export const C = {
   dim: "rgba(238,241,247,0.45)",
   dim2: "rgba(238,241,247,0.28)",
   acc: "#b7ff2e",
+  accInk: "#05060a",  // text drawn on top of the accent
+  accDeep: "#8fe31f",   // gradient end for the accent
   acc2: "#5a8cff",
   danger: "#ff7e5f",
   warn: "#ffb46b",

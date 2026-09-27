@@ -23,6 +23,7 @@ const BASE = {
   // labels
   label: { fontSize: 10, fontWeight: "600", letterSpacing: 2.6, textTransform: "uppercase" },
   mono: { fontSize: 11, letterSpacing: 0.4, fontWeight: "500" },
+  badge: { fontSize: 10, letterSpacing: 0, fontWeight: "800" },
   action: { fontSize: 15, fontWeight: "700", letterSpacing: 0.2 },
 } satisfies Scale;
 

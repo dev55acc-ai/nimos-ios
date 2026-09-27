@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useReduceMotion } from "./a11y";
 
+/** Motion constants, mirrored from src/design/tokens.ts. One system, one place. */
+export const MOTION = {
+  entry: 320,
+  exit: 200,
+  press: { in: 90, out: 180 },
+  stagger: 24,
+  shimmer: 1150,   // a texture loop, slower than an entrance on purpose
+  // mirrors motion.selection in src/design/tokens.ts — the tab indicator
+  selection: { damping: 14, stiffness: 120, mass: 0.7 } as const,
+} as const;
+
 /** Arrival easing. Used by every entrance in the kit. */
 export const EASE_OUT = Easing.bezier(0.22, 1, 0.36, 1);
 

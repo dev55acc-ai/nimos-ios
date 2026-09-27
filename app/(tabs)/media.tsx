@@ -77,7 +77,7 @@ export default function MediaScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Header />
 
-      <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+      <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
         <Text style={[t.hero, { color: C.txt }]} accessibilityRole="header">
           Media
         </Text>
@@ -166,7 +166,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
     >
       <View
         style={{
-          paddingHorizontal: 14,
+          paddingHorizontal: 12,
           paddingVertical: 8,
           borderRadius: 17,
           borderWidth: 1,
@@ -187,7 +187,7 @@ function MediaRow({ item, onVerdict }: { item: MediaItem; onVerdict: (m: MediaIt
   const trashed = item.status === "killed";
 
   return (
-    <Glass style={{ flexDirection: "row", padding: 10, gap: 12, opacity: trashed ? 0.55 : 1 }}>
+    <Glass style={{ flexDirection: "row", padding: 8, gap: 12, opacity: trashed ? 0.55 : 1 }}>
       <View
         style={{
           width: 68,
@@ -207,7 +207,7 @@ function MediaRow({ item, onVerdict }: { item: MediaItem; onVerdict: (m: MediaIt
         />
         {item.kind === "video" ? (
           <View style={{ position: "absolute", bottom: 3, right: 4 }}>
-            <Text style={{ fontSize: 9, color: C.acc, fontWeight: "800" }}>▶</Text>
+            <Text style={[t.mono, { color: C.acc, fontWeight: "800" }]}>▶</Text>
           </View>
         ) : null}
       </View>
@@ -249,7 +249,7 @@ function VerdictButton({ label, on, onPress }: { label: string; on: boolean; onP
       style={({ pressed }) => ({
         minHeight: 32,
         justifyContent: "center",
-        paddingHorizontal: 14,
+        paddingHorizontal: 12,
         borderRadius: 16,
         borderWidth: 1,
         borderColor: on ? C.acc : C.cardLine,

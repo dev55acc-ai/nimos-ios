@@ -11,8 +11,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { C, RADIUS } from "../../src/theme";
-import { HIT } from "../../src/type";
+import { HIT, useType } from "../../src/type";
 import { haptic, useReduceMotion } from "../../src/a11y";
+import { MOTION } from "../../src/motion";
 import { Mark, type MarkName } from "../../components/Mark";
 
 /** Add a destination here and a matching app/(tabs)/<name>.tsx screen. */
@@ -36,19 +37,20 @@ function TabButton({
   onPress: () => void;
 }) {
   const reduce = useReduceMotion();
-  const t = useSharedValue(focused ? 1 : 0);
+  const ty = useType();
+  const focus = useSharedValue(focused ? 1 : 0);
 
   useEffect(() => {
     if (reduce) {
-      t.value = withTiming(focused ? 1 : 0, { duration: 90 });
+      focus.value = withTiming(focused ? 1 : 0, { duration: 90 });
       return;
     }
-    t.value = withSpring(focused ? 1 : 0, { damping: 15, stiffness: 180, mass: 0.5 });
-  }, [focused, reduce, t]);
+    focus.value = withSpring(focused ? 1 : 0, MOTION.selection);
+  }, [focused, reduce, focus]);
 
   const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(t.value, [0, 1], [2.5, 0]) }, { scale: interpolate(t.value, [0, 1], [0.92, 1]) }],
-    opacity: interpolate(t.value, [0, 1], [0.5, 1]),
+    transform: [{ translateY: interpolate(focus.value, [0, 1], [2.5, 0]) }, { scale: interpolate(focus.value, [0, 1], [0.92, 1]) }],
+    opacity: interpolate(focus.value, [0, 1], [0.5, 1]),
   }));
 
   return (
@@ -80,7 +82,7 @@ function TabButton({
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 9, fontWeight: "800", color: "#05060a" }}>{badge}</Text>
+              <Text style={[ty.badge, { color: C.accInk }]}>{badge}</Text>
             </View>
           ) : null}
         </View>
@@ -109,7 +111,7 @@ export default function TabsLayout() {
             borderRadius: RADIUS.pill,
             overflow: "hidden",
             flexDirection: "row",
-            shadowColor: "#000",
+            shadowColor: C.void,
             shadowOpacity: 0.55,
             shadowRadius: 26,
             shadowOffset: { width: 0, height: 12 },

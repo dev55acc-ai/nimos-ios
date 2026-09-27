@@ -18,9 +18,8 @@ const field = {
   borderWidth: 1,
   borderRadius: RADIUS.btn,
   paddingHorizontal: 16,
-  paddingVertical: 14,
+  paddingVertical: 12,
   color: C.txt,
-  fontSize: 15,
 } as const;
 
 export default function LinkScreen() {
@@ -77,7 +76,7 @@ export default function LinkScreen() {
         />
         <Animated.View style={rise}>
           <Animated.Text
-            style={[t.wordmark, { fontSize: 48, letterSpacing: -2.6, color: C.txt }]}
+            style={[t.wordmark, { color: C.txt }]}
             accessibilityRole="header"
           >
             nimos
@@ -124,7 +123,7 @@ export default function LinkScreen() {
             wrapperStyle={{ marginTop: 16 }}
           />
           {check ? (
-            <Glass style={{ padding: 14, marginTop: 16 }}>
+            <Glass style={{ padding: 12, marginTop: 16 }}>
               <Text style={[t.caption, { color: C.acc }]}>{check}</Text>
             </Glass>
           ) : null}

@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { C, RADIUS, T } from "../src/theme";
 import { useType, HIT } from "../src/type";
 import { haptic, useReduceMotion } from "../src/a11y";
+import { MOTION } from "../src/motion";
 import { Glass } from "./ui";
 import { Mark } from "./Mark";
 
@@ -15,7 +16,7 @@ export function Skeleton({ height = 18, width = "100%", style }: { height?: numb
 
   useEffect(() => {
     if (reduce) return;
-    t.value = withRepeat(withTiming(1, { duration: 1150, easing: Easing.inOut(Easing.quad) }), -1, true);
+    t.value = withRepeat(withTiming(1, { duration: MOTION.shimmer, easing: Easing.inOut(Easing.quad) }), -1, true);
   }, [reduce, t]);
 
   const anim = useAnimatedStyle(() => ({ opacity: 0.35 + t.value * 0.35 }));

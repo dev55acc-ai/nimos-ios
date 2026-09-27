@@ -119,8 +119,8 @@ export default function CeoChat() {
       style={{ flex: 1, backgroundColor: C.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 10 }}>
-        <Text style={[t.h1, { color: C.txt, fontSize: 24 }]} numberOfLines={1} accessibilityRole="header">
+      <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 8 }}>
+        <Text style={[t.title, { color: C.txt }]} numberOfLines={1} accessibilityRole="header">
           {title}
         </Text>
         <Text style={[t.caption, { color: C.dim, marginTop: 2 }]} numberOfLines={1}>
@@ -142,7 +142,7 @@ export default function CeoChat() {
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           ListHeaderComponent={
             agent?.sole_goal ? (
-              <Glass style={{ padding: 14, marginBottom: 6 }}>
+              <Glass style={{ padding: 12, marginBottom: 6 }}>
                 <Text style={[t.label, { color: C.dim2 }]}>Sole goal</Text>
                 <Text style={[t.caption, { color: C.dim, marginTop: 6 }]}>{agent.sole_goal}</Text>
               </Glass>
@@ -167,7 +167,7 @@ export default function CeoChat() {
           alignItems: "flex-end",
           gap: 10,
           paddingHorizontal: 16,
-          paddingTop: 10,
+          paddingTop: 8,
           paddingBottom: Math.max(insets.bottom, 12),
           borderTopWidth: 1,
           borderTopColor: C.cardLine,
@@ -193,7 +193,6 @@ export default function CeoChat() {
             paddingTop: 12,
             paddingBottom: 12,
             color: C.txt,
-            fontSize: 15,
           }}
         />
         <Pressable
@@ -211,7 +210,7 @@ export default function CeoChat() {
             opacity: pressed ? 0.8 : 1,
           })}
         >
-          <Text style={{ color: draft.trim() ? "#05060a" : C.dim2, fontWeight: "900", fontSize: 16 }}>↑</Text>
+          <Text style={[t.body, { color: draft.trim() ? C.accInk : C.dim2, fontWeight: "900" }]}>↑</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -233,7 +232,7 @@ function Bubble({ role, content, streaming }: { role: string; content: string; s
           borderWidth: mine ? 0 : 1,
           borderColor: C.cardLine,
           borderRadius: 18,
-          paddingHorizontal: 14,
+          paddingHorizontal: 12,
           paddingVertical: 11,
         }}
       >

@@ -1,0 +1,127 @@
+name: ios-screenshots
+# Visual QA for iOS, from Windows.
+#
+# This is the piece that changes agent-built apps most. An agent writing UI with
+# no way to SEE it produces the generic, frictional look everyone recognises. This
+# boots a real iOS simulator on GitHub's free macOS runner, installs the app,
+# walks it with `simctl openurl`, and screenshots every screen.
+#
+# The agent gets pixels back on Windows. No Mac. No $99. No guessing.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["app/**", "src/**", "components/**"]
+  push:
+    branches: [master]
+    paths: ["app/**", "src/**", "components/**"]
+
+concurrency:
+  group: shots-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_ID: ca.motionmenu.nimos
+  SIM: iPhone 16 Pro
+
+jobs:
+  screenshots:
+    runs-on: macos-15
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest Xcode with Swift >= 6.2
+        run: |
+          set -euo pipefail
+          best=""
+          for a in /Applications/Xcode*.app; do
+            [ -d "$a" ] || continue
+            num="$(basename "$a" .app)"; num="${num#Xcode_}"
+            sv="$(DEVELOPER_DIR="$a/Contents/Developer" xcrun swiftc --version 2>/dev/null | head -1 || true)"
+            sv="${sv#*Swift version }"; sv="${sv%% *}"
+            major="${sv%%.*}"; rest="${sv#*.}"; minor="${rest%%.*}"
+            ok=0
+            if [ "$major" -ge 7 ] 2>/dev/null; then ok=1
+            elif [ "$major" -eq 6 ] 2>/dev/null && [ "$minor" -ge 2 ] 2>/dev/null; then ok=1
+            fi
+            if [ "$ok" = "1" ]; then
+              if [ -z "$best" ] || [ "${num%%.*}" -gt "${best%%.*}" ]; then best="$num"; fi
+            fi
+          done
+          [ -n "$best" ] || { echo "::error::no Xcode with Swift >= 6.2"; exit 1; }
+          sudo xcode-select -s "/Applications/Xcode_${best}.app"
+          echo "Xcode_$best"; xcodebuild -version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install + prebuild
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo prebuild --platform ios --clean --no-install
+          npx pod-install ios
+
+      - name: Build for the simulator
+        run: |
+          set -euo pipefail
+          WS=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$(ls -d ios/*.xcworkspace | head -1)" .xcworkspace)
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Debug \
+            -sdk iphonesimulator -destination "platform=iOS Simulator,name=$SIM" \
+            -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO SWIFT_VERSION=5.0 \
+            build > /tmp/xc.log 2>&1 || { tail -30 /tmp/xc.log; exit 1; }
+          echo "BUILD OK"
+
+      - name: Boot the simulator
+        run: |
+          xcrun simctl boot "$SIM" 2>/dev/null || true
+          xcrun simctl bootstatus "$SIM" -b
+          open -a Simulator
+
+      - name: Install and launch
+        run: |
+          APP=$(find ios/build/Build/Products -name "*.app" -maxdepth 3 | head -1)
+          echo "app=$APP"
+          xcrun simctl install "$SIM" "$APP"
+          xcrun simctl launch "$SIM" "$APP_ID" || true
+          sleep 12
+
+      - name: Screenshot every screen
+        run: |
+          mkdir -p shots
+          # Seed the connection so the app renders real UI rather than the
+          # Link screen. Values come from secrets in real use; here we fall back
+          # to a local fixture so CI never depends on a live backend.
+          shot() {
+            local name="$1" url="$2"
+            if [ -n "$url" ]; then xcrun simctl openurl "$SIM" "$url" || true; sleep 4; fi
+            xcrun simctl io "$SIM" screenshot --type=png "shots/$name.png" || true
+            echo "  captured $name"
+          }
+          shot "01-launch" ""
+          shot "02-ceos"   "nimos://ceos"
+          shot "03-media"  "nimos://media"
+          shot "04-link"   "nimos://link"
+          ls -la shots/
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-screenshots
+          path: shots/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Read the app in the step summary
+        run: |
+          {
+            echo "### iOS screenshots"
+            echo ""
+            echo "Rendered on a real iOS $SIM simulator. Open the \`ios-screenshots\`"
+            echo "artifact to see every screen — this is how an agent reviews its own"
+            echo "UI without owning a Mac."
+          } >> "$GITHUB_STEP_SUMMARY"

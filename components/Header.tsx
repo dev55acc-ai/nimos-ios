@@ -3,10 +3,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { C } from "../src/theme";
 import { getConn, getConnSync, isLinked } from "../src/api";
+import { useType } from "../src/type";
 
 /** The only persistent chrome: wordmark + whether the spine is linked. */
 export function Header() {
   const insets = useSafeAreaInsets();
+  const t = useType();
   void getConn();
   const c = getConnSync();
   const live = isLinked(c);
@@ -22,7 +24,7 @@ export function Header() {
         alignItems: "center",
       }}
     >
-      <Animated.Text style={{ fontSize: 26, fontWeight: "800", letterSpacing: -1.4, color: C.txt }}>
+      <Animated.Text style={[t.wordmark, { color: C.txt }]}>
         nimos
         <Animated.Text style={{ color: C.acc }}>.</Animated.Text>
       </Animated.Text>
@@ -36,7 +38,7 @@ export function Header() {
         }}
       />
       <View style={{ flex: 1 }} />
-      <Animated.Text style={{ fontSize: 11, letterSpacing: 0.4, color: C.dim }}>
+      <Animated.Text style={[t.mono, { color: C.dim }]}>
         {live ? "spine" : "offline"}
       </Animated.Text>
     </Animated.View>
