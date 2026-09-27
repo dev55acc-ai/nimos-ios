@@ -126,6 +126,7 @@ export async function chat(
   sessionId: string,
   message: string,
   onToken: (chunk: string) => void,
+  onSession?: (id: string) => void,
 ): Promise<() => void> {
   const { url } = await getConn();
   const controller = new AbortController();
@@ -157,9 +158,21 @@ export async function chat(
             const payload = line.slice(5).trim();
             if (!payload || payload === "[DONE]") continue;
             try {
-              const parsed = JSON.parse(payload) as { token?: string; content?: string; text?: string };
-              const chunk = parsed.token ?? parsed.content ?? parsed.text;
-              if (chunk) onToken(chunk);
+              const parsed = JSON.parse(payload) as {
+                type?: string;
+                token?: string;
+                content?: string;
+                text?: string;
+                session_id?: string;
+              };
+              // The spine may open its OWN session and announce it. If we keep
+              // our own id we will read an empty history afterwards, so adopt
+              // whatever the server says it actually used.
+              if (parsed.session_id) onSession?.(parsed.session_id);
+              if (parsed.type === "text" || parsed.token || parsed.content) {
+                const chunk = parsed.token ?? parsed.content ?? parsed.text;
+                if (chunk) onToken(chunk);
+              }
             } catch {
               onToken(payload); // some frames are plain text
             }
@@ -194,11 +207,15 @@ export type MediaItem = {
   thumb_url: string;
 };
 
-export const getMedia = (opts: { status?: string; limit?: number } = {}) => {
+export const getMedia = async (opts: { status?: string; limit?: number } = {}) => {
   const q = new URLSearchParams();
   if (opts.status) q.set("status", opts.status);
   q.set("limit", String(opts.limit ?? 120));
-  return get<{ media: MediaItem[] }>(`/api/media/library?${q.toString()}`);
+  const res = await get<{ media: MediaItem[] }>(`/api/media/library?${q.toString()}`);
+  // thumb_url is null until a thumbnail has been generated on the server; fall
+  // back to the full-size asset so the grid never renders a broken tile.
+  res.media = res.media.map((m) => ({ ...m, thumb_url: m.thumb_url || m.url }));
+  return res;
 };
 
 export const setVerdict = (id: number, verdict: "kept" | "killed") =>

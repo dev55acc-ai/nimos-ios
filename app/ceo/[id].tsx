@@ -85,10 +85,16 @@ export default function CeoChat() {
 
     let acc = "";
     try {
-      const stop = await chat(agentId, sessionId, text, (chunk) => {
-        acc += chunk;
-        setStream(acc);
-      });
+      const stop = await chat(
+        agentId,
+        sessionId,
+        text,
+        (chunk) => {
+          acc += chunk;
+          setStream(acc);
+        },
+        (real) => setSessionId(real)
+      );
       cancelRef.current = stop;
       // SSE closes when the model is done; commit the reply
       const wait = setInterval(() => {}, 1_000);
