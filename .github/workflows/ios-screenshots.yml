@@ -22,7 +22,7 @@ concurrency:
 
 env:
   APP_ID: ca.motionmenu.nimos
-  SIM: iPhone 16 Pro
+  # resolved at runtime from the available simulator list
 
 jobs:
   screenshots:
@@ -89,24 +89,31 @@ jobs:
           # ships no JS bundle, so the app red-boxes with "No script URL
           # provided". That is what the first screenshot run caught.
           xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
-            -sdk iphonesimulator -destination "platform=iOS Simulator,name=$SIM" \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO SWIFT_VERSION=5.0 \
             build > /tmp/xc.log 2>&1 || { tail -30 /tmp/xc.log; exit 1; }
           echo "BUILD OK"
 
       - name: Boot the simulator
         run: |
-          xcrun simctl boot "$SIM" 2>/dev/null || true
-          xcrun simctl bootstatus "$SIM" -b
+          set -euo pipefail
+          # Resolve an AVAILABLE device at runtime. Hardcoding "iPhone 16 Pro"
+          # fails whenever the image isn't present on the runner.
+          DEV=$(xcrun simctl list devices available | grep -oE "^ +iPhone [^(]+" | head -1 | sed 's/^ *//;s/ *$//')
+          [ -n "$DEV" ] || { echo "::error::no available iPhone simulator"; xcrun simctl list devices available; exit 1; }
+          echo "SIMULATOR=$DEV" >> "$GITHUB_ENV"
+          echo "using: $DEV"
+          xcrun simctl boot "$DEV" 2>/dev/null || true
+          xcrun simctl bootstatus "$DEV" -b
           open -a Simulator
 
       - name: Install and launch
         run: |
           APP=$(find ios/build/Build/Products -name "*.app" -maxdepth 3 | head -1)
           echo "app=$APP"
-          xcrun simctl install "$SIM" "$APP"
+          xcrun simctl install "$SIMULATOR" "$APP"
           # capture the app's own output: this is where a JS error shows up
-          ( xcrun simctl launch --console "$SIM" "$APP_ID" > /tmp/app.log 2>&1 & ) || true
+          ( xcrun simctl launch --console "$SIMULATOR" "$APP_ID" > /tmp/app.log 2>&1 & ) || true
           sleep 14
           echo "--- app console (last 20) ---"
           tail -20 /tmp/app.log || echo "(no output)"
@@ -119,8 +126,8 @@ jobs:
           # to a local fixture so CI never depends on a live backend.
           shot() {
             local name="$1" url="$2"
-            if [ -n "$url" ]; then xcrun simctl openurl "$SIM" "$url" || true; sleep 4; fi
-            xcrun simctl io "$SIM" screenshot --type=png "shots/$name.png" || true
+            if [ -n "$url" ]; then xcrun simctl openurl "$SIMULATOR" "$url" || true; sleep 4; fi
+            xcrun simctl io "$SIMULATOR" screenshot --type=png "shots/$name.png" || true
             echo "  captured $name"
           }
           shot "01-launch" ""
