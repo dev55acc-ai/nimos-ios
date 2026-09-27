@@ -70,7 +70,10 @@ jobs:
           set -euo pipefail
           WS=$(ls -d ios/*.xcworkspace | head -1)
           SCHEME=$(basename "$(ls -d ios/*.xcworkspace | head -1)" .xcworkspace)
-          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Debug \
+          # Release, not Debug: a Debug build expects a Metro dev server and
+          # ships no JS bundle, so the app red-boxes with "No script URL
+          # provided". That is what the first screenshot run caught.
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
             -sdk iphonesimulator -destination "platform=iOS Simulator,name=$SIM" \
             -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO SWIFT_VERSION=5.0 \
             build > /tmp/xc.log 2>&1 || { tail -30 /tmp/xc.log; exit 1; }
